@@ -225,7 +225,7 @@ int main(int argc, char **argv)
         fflush(stdout);
         fgets(cmd_buffer, 4096, stdin);
         len = strlen(cmd_buffer);
-        if (cmd_buffer[len - 1] == '\n')
+        if (len != 0 && cmd_buffer[len - 1] == '\n')
         {
             cmd_buffer[len - 1] = 0;
         }
