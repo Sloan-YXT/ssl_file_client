@@ -12,6 +12,7 @@
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <termio.h>
+#include <sys/wait.h>
 #include "ytp.h"
 using namespace std;
 #define MAXBUF 4096
@@ -136,6 +137,12 @@ restart:
             tcsetattr(fileno(stdin), TCSANOW, &tty);
             printf("\r\n");
             //funlockfile(stdin);
+            int pid = fork();
+            if (pid == 0)
+            {
+                execlp("reset", "reset", NULL);
+            }
+            wait(NULL);
             break;
         }
         SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
