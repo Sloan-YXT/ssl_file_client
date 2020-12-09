@@ -3,6 +3,8 @@ enum status
     LOGIN_FAILURE = -1,
     LOGIN_PROC = 0,
     LOGIN_SUCCESS = 1,
+    CMD = 2,
+    FSM = 3,
 };
 class Ytp
 {

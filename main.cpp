@@ -157,13 +157,18 @@ restart:
         //SSL_ERR_ACTION(SSL_write(ssl, buffer, len), "SSL WRITE FAILED IN 64", ssl);
     }
 }
+SSL *ssl;
+void clean(void)
+{
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+}
 int main(int argc, char **argv)
 {
     int sockfd, len;
     struct sockaddr_in dest;
-
     SSL_CTX *ctx;
-    SSL *ssl;
+
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
@@ -199,7 +204,7 @@ int main(int argc, char **argv)
 
     ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sockfd);
-
+    atexit(clean);
     if (SSL_connect(ssl) == -1)
         ERR_print_errors_fp(stderr);
     else
@@ -208,7 +213,36 @@ int main(int argc, char **argv)
         ShowCerts(ssl);
     }
     login(ssl, sockfd);
+    char cmd_buffer[4096 + 1];
+    char server_buffer[4096 + 1];
+    char response_buffer[4096 + 1];
+    Ytp ytp_cmd;
+    char *part1;
+    int n;
     while (1)
     {
+        printf("ytp>");
+        fflush(stdout);
+        fgets(cmd_buffer, 4096, stdin);
+        len = strlen(cmd_buffer);
+        if (cmd_buffer[len - 1] == '\n')
+        {
+            cmd_buffer[len - 1] = 0;
+        }
+        char cmd_tmp[4096 + 1];
+        strcpy(cmd_tmp, cmd_buffer);
+        part1 = strtok(cmd_tmp, " ");
+        if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0)
+        {
+            ytp_cmd.setArgs("CMD", "ACTIVE", CMD, strlen(cmd_buffer) + 1);
+            strcpy(response_buffer, ytp_cmd.content);
+            strcat(response_buffer, cmd_buffer);
+            n = SSL_write(ssl, response_buffer, strlen(response_buffer) + 1);
+            SSL_ERR_ACTION(n, "write failed in 228", ssl);
+            n = SSL_read(ssl, server_buffer, 4096 + 1);
+            SSL_ERR_ACTION(n, "read failed in 228", ssl);
+            char *p = ytp_cmd.parser(server_buffer);
+            printf("%s\n", p);
+        }
     }
 }
