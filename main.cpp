@@ -11,13 +11,19 @@
 #include <openssl/err.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
+#include <termio.h>
 #include "ytp.h"
 using namespace std;
-#define MAXBUF 1024
+#define MAXBUF 4096
 #define MAXSERVER 4096
 #define PORT 9090
 #define ADDR "172.81.227.199"
 //SSL_ERROR_ZERO_RETURN
+#define DEBUG                           \
+    do                                  \
+    {                                   \
+        printf("debug:%d\n", __LINE__); \
+    } while (0)
 #define SSL_ERR_ACTION(f, a, ssl)                  \
     do                                             \
     {                                              \
@@ -50,52 +56,93 @@ void ShowCerts(SSL *ssl)
     else
         printf("无证书信息！\n");
 }
-char buffer[MAXBUF + 1];
-char server_buffer[MAXSERVER + 1];
+
 void login(SSL *ssl, int fd)
 {
+    // setbuf(stdin, NULL);
+    // setbuf(stdout, NULL);
+    // setbuf(stderr, NULL);
+    char buffer[4096 + 1];
+    char tmp[4096 + 1];
+    char server_buffer[4096 + 1];
+    Ytp ytp_login;
+    char *p;
+restart:
     SSL_read(ssl, server_buffer, MAXSERVER);
-    printf("%s", server_buffer);
+    //printf("debug:%d\n", __LINE__);
+    //puts(server_buffer);
+    p = ytp_login.parser(server_buffer);
+    //printf("123");
+    printf("%s", p);
+
     fgets(buffer, MAXBUF + 1, stdin);
     int len = strlen(buffer);
     if (buffer[len - 1] == '\n')
     {
         buffer[len - 1] = 0;
     }
-    int len1;
-    len1 = htonl(len);
-    send(fd, &len1, sizeof(len1), 0);
-    SSL_ERR_ACTION(SSL_write(ssl, buffer, len), "SSL WRITE FAILED IN 64", ssl);
+    // int len1;
+    // len1 = htonl(len);
+    // send(fd, &len1, sizeof(len1), 0);
+    Ytp ytp("LOGIN", "SETUP", LOGIN_PROC, len);
+    strcpy(tmp, ytp.content);
+    strcat(tmp, buffer);
+    SSL_ERR_ACTION(SSL_write(ssl, tmp, strlen(tmp) + 1), "SSL WRITE FAILED IN 64", ssl);
     int n;
-    char *p;
-    Ytp ytp;
+
     SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
     p = ytp.parser(server_buffer);
     printf("%s", p);
     //username->yxt->passwd;
+    //printf("debug:%d\n", __LINE__);
+    if (ytp.code == LOGIN_FAILURE)
+    {
+        goto restart;
+    }
+    //printf("debug:%d\n", __LINE__);
+    struct termios tty;
+    unsigned short tty_flags;
+    tcgetattr(fileno(stdin), &tty);
+    tty_flags = tty.c_lflag;
+    //DEBUG;
+    tty.c_lflag &= ~(ECHO | ECHOE | ECHONL | ECHOK);
+    //int tty_fd = open("/dev/tty", O_RDWR | O_NOCTTY);
+    tcsetattr(fileno(stdin), TCSANOW, &tty);
+    //flockfile(stdin);
     fgets(buffer, MAXBUF + 1, stdin);
+    printf("\r\n");
     len = strlen(buffer);
     //len1 = htonl(len);
     //send(fd, &len1, sizeof(len1), 0);
-    SSL_ERR_ACTION(SSL_write(ssl, buffer, len), "SSL WRITE FAILED IN 64", ssl);
     if (buffer[len - 1] == '\n')
     {
         buffer[len - 1] = 0;
     }
+    ytp.setArgs("LOGIN", "SETUP", LOGIN_PROC, len);
+    strcpy(tmp, ytp.content);
+    strcat(tmp, buffer);
+    SSL_ERR_ACTION(SSL_write(ssl, tmp, strlen(tmp) + 1), "SSL WRITE FAILED IN 64", ssl);
     while (1)
     {
 
         SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
+        //puts(server_buffer);
         p = ytp.parser(server_buffer);
         printf("%s", p);
         if (ytp.code > 0)
         {
+
+            tty.c_lflag = tty_flags;
+            tcsetattr(fileno(stdin), TCSANOW, &tty);
+            printf("\r\n");
+            //funlockfile(stdin);
             break;
         }
         SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
         p = ytp.parser(server_buffer);
         printf("%s", p);
         fgets(buffer, MAXBUF + 1, stdin);
+        printf("\r\n");
         len = strlen(buffer);
         //len1 = htonl(len);
         if (buffer[len - 1] == '\n')
@@ -103,7 +150,11 @@ void login(SSL *ssl, int fd)
             buffer[len - 1] = 0;
         }
         //send(fd, &len1, sizeof(len1), 0);
-        SSL_ERR_ACTION(SSL_write(ssl, buffer, len), "SSL WRITE FAILED IN 64", ssl);
+        ytp.setArgs("LOGIN", "SETUP", LOGIN_PROC, len);
+        strcpy(tmp, ytp.content);
+        strcat(tmp, buffer);
+        SSL_ERR_ACTION(SSL_write(ssl, tmp, strlen(tmp) + 1), "SSL WRITE FAILED IN 64", ssl);
+        //SSL_ERR_ACTION(SSL_write(ssl, buffer, len), "SSL WRITE FAILED IN 64", ssl);
     }
 }
 int main(int argc, char **argv)
@@ -156,7 +207,6 @@ int main(int argc, char **argv)
         printf("Connected with %s encryption\n", SSL_get_cipher(ssl));
         ShowCerts(ssl);
     }
-    bzero(buffer, MAXBUF + 1);
     login(ssl, sockfd);
     while (1)
     {

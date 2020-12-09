@@ -9,7 +9,7 @@ LENGTH:****
 #include <cstring>
 using namespace std;
 
-Ytp::Ytp(char *type, char *status, int code, int len)
+Ytp::Ytp(const char *type, const char *status, int code, int len)
 {
     this->type = new char[100];
     strcpy(this->type, type);
@@ -47,7 +47,21 @@ char *Ytp::parser(char *message)
 }
 Ytp::Ytp()
 {
+    //cout << "test";
     this->type = new char[100];
     this->status = new char[100];
     this->content = new char[300 + 255];
+}
+void Ytp::setArgs(const char *type, const char *status, int code, int len)
+{
+    this->type = new char[100];
+    strcpy(this->type, type);
+    this->status = new char[100];
+    strcpy(this->status, status);
+    this->code = code;
+    this->len = len;
+    this->content = new char[300 + 255];
+    int pre_len;
+    //cout << "debug:in ytp" << endl;
+    pre_len = sprintf(content, "TYPE:%s\r\nSTATUS:%s\r\nCODE:%d\r\nLENGTH:%d\n", type, status, code, len);
 }
