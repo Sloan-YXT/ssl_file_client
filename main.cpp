@@ -31,7 +31,7 @@ using namespace std;
 #define SSL_ERR_ACTION(f, a, ssl)                  \
     do                                             \
     {                                              \
-        if (f <= 0)                                \
+        if ((f) <= 0)                              \
         {                                          \
             perror(a);                             \
             ERR_print_errors_fp(stdout);           \
@@ -42,7 +42,7 @@ using namespace std;
 #define ERR_ACTION(f, a) \
     do                   \
     {                    \
-        if (f < 0)       \
+        if ((f) < 0)     \
         {                \
             perror(a);   \
             exit(1);     \
@@ -378,7 +378,8 @@ int main(int argc, char **argv)
             n = send(sockfd, &hlen, sizeof(hlen), 0);
             ERR_ACTION(n, "sendfile len send len failed");
             int filefd = fileno(file);
-            fseek(file, 0, SEEK_SET);
+            if (user_info == NULL)
+                fseek(file, 0, SEEK_SET);
             void *addr_png_1;
             if ((addr_png_1 = mmap(NULL, len, PROT_READ, MAP_SHARED, filefd, 0)) == MAP_FAILED)
             {
@@ -408,13 +409,7 @@ int main(int argc, char **argv)
                 printf("too much arguments\n");
                 continue;
             }
-            int filefd = open(part2, O_CREAT | O_RDWR | O_TRUNC, 0777);
-            if (filefd == -1)
-            {
-                perror("open failed");
-                strcpy(cmd_buffer, strerror(errno));
-                goto end;
-            }
+
             char *p;
             ytp_cmd.setArgs("FILE", "ACTIVE", FSM, strlen(cmd_buffer) + 1);
             strcpy(response_buffer, ytp_cmd.content);
@@ -424,30 +419,55 @@ int main(int argc, char **argv)
             n = SSL_read(ssl, server_buffer, 4096 + 1);
             SSL_ERR_ACTION(n, "ssl read failed in getfile", ssl);
             p = ytp_cmd.parser(server_buffer);
-            printf("%d\n", ytp_cmd.code);
+            //printf("%d\n", ytp_cmd.code);
             if (ytp_cmd.code == FSMF)
             {
                 strcpy(cmd_buffer, p);
                 goto end;
             }
-            n = recv(sockfd, &len, 4, 0);
-            ERR_ACTION(n, "recv failed in getfile:recvlen");
-            len = ntohl(len);
-            lseek(filefd, len - 1, SEEK_SET);
-            n = write(filefd, "\0", 1);
-            ERR_ACTION(n, "prewrite failed in getfile");
-            //int jlen = ((len - 1) / 4096 + 1) * 4096;
-            char *q;
-            if ((q = (char *)mmap(NULL, len, PROT_WRITE, MAP_SHARED, filefd, 0)) == MAP_FAILED)
             {
-                perror("mmap failed in sendfile");
-                exit(1);
+                int filefd = open(part2, O_CREAT | O_RDWR | O_TRUNC, 0777);
+                int err_mark = 0;
+                if (filefd == -1)
+                {
+                    perror("open failed");
+                    strcpy(cmd_buffer, strerror(errno));
+                    err_mark = 1;
+                }
+                n = recv(sockfd, &len, 4, 0);
+                ERR_ACTION(n, "recv failed in getfile:recvlen");
+                len = ntohl(len);
+                lseek(filefd, len - 1, SEEK_SET);
+                n = write(filefd, "\0", 1);
+                ERR_ACTION(n, "prewrite failed in getfile");
+                //int jlen = ((len - 1) / 4096 + 1) * 4096;
+                char *q;
+                if (err_mark)
+                {
+                    q = new char[len];
+                }
+                else
+                {
+                    if ((q = (char *)mmap(NULL, len, PROT_WRITE, MAP_SHARED, filefd, 0)) == MAP_FAILED)
+                    {
+                        perror("mmap failed in sendfile");
+                        exit(1);
+                    }
+                    strcpy(cmd_buffer, "getfile success!");
+                }
+                n = SSL_recv(ssl, (char *)q, len);
+                SSL_ERR_ACTION(n, "ssl recvfailed in getfile", ssl);
+
+                if (err_mark)
+                {
+                    free(q);
+                }
+                else
+                {
+                    ERR_ACTION(munmap(q, len), "munmap failed in error action");
+                    close(filefd);
+                }
             }
-            n = SSL_recv(ssl, (char *)q, len);
-            SSL_ERR_ACTION(n, "ssl recvfailed in getfile", ssl);
-            ERR_ACTION(munmap(q, len), "munmap failed in error action");
-            strcpy(cmd_buffer, "getfile success!");
-            close(filefd);
         end:
             printf("%s\n", cmd_buffer);
         }
