@@ -5,6 +5,7 @@ enum status
     LOGIN_SUCCESS = 1,
     CMD = 2,
     FSM = 3,
+    FSMF = 4
 };
 class Ytp
 {
