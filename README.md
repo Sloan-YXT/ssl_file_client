@@ -7,20 +7,20 @@ the client of ytp-server.
 
 
 .
-├── client
-├── main.cpp
-├── makefile
-├── README.md
-├── ssl_util.cpp
-├── ssl_util.h
-├── test
-│   ├── 1.png
-│   ├── client
-│   ├── client.cpp
-│   ├── makefile
-│   └── test
-├── ytp.cpp
-└── ytp.h
+├── client  
+├── main.cpp  
+├── makefile  
+├── README.md  
+├── ssl_util.cpp  
+├── ssl_util.h  
+├── test  
+│   ├── 1.png  
+│   ├── client  
+│   ├── client.cpp  
+│   ├── makefile  
+│   └── test  
+├── ytp.cpp  
+└── ytp.h  
 
 运行方法：make-->./client即可
 
