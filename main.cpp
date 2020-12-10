@@ -49,9 +49,9 @@ using namespace std;
             exit(1);     \
         }                \
     } while (0)
+#define DEBUG
 char user_name_local[4096 + 1];
 string home_dir;
-#define DEBUG
 void ShowCerts(SSL *ssl)
 {
     X509 *cert;
@@ -404,7 +404,7 @@ int main(int argc, char **argv)
         else if (strcmp(part1, "getfile") == 0)
         {
             DEBUG;
-            printf("debug:part1:%s\n", part1);
+            //printf("debug:part1:%s\n", part1);
             char *part2, *part3;
             part2 = strtok(NULL, " ");
             part3 = strtok(NULL, " ");
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
             strcat(response_buffer, cmd_buffer);
             n = SSL_write(ssl, response_buffer, strlen(response_buffer) + 1);
             SSL_ERR_ACTION(n, "ssl write failed in getfile", ssl);
-            n = SSL_read(ssl, server_buffer, strlen(response_buffer) + 1);
+            n = SSL_read(ssl, server_buffer, 4096 + 1);
             SSL_ERR_ACTION(n, "ssl read failed in getfile", ssl);
             p = ytp_cmd.parser(server_buffer);
             //printf("%d\n", ytp_cmd.code);
@@ -435,6 +435,7 @@ int main(int argc, char **argv)
                 goto end;
             }
             {
+                DEBUG;
                 int filefd = open(part2, O_CREAT | O_RDWR | O_TRUNC, 0777);
                 int err_mark = 0;
                 if (filefd == -1)
