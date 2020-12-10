@@ -22,22 +22,23 @@ using namespace std;
 #define MAXSERVER 4096
 #define PORT 9090
 #define ADDR "172.81.227.199"
+
 //SSL_ERROR_ZERO_RETURN
 #define DEBUG                           \
     do                                  \
     {                                   \
         printf("debug:%d\n", __LINE__); \
     } while (0)
-#define SSL_ERR_ACTION(f, a, ssl)                  \
-    do                                             \
-    {                                              \
-        if ((f) <= 0)                              \
-        {                                          \
-            perror(a);                             \
-            ERR_print_errors_fp(stdout);           \
-            printf("%d\n", SSL_get_error(ssl, f)); \
-            exit(1);                               \
-        }                                          \
+#define SSL_ERR_ACTION(f, a, ssl)                                 \
+    do                                                            \
+    {                                                             \
+        if ((f) <= 0)                                             \
+        {                                                         \
+            perror(a);                                            \
+            ERR_print_errors_fp(stdout);                          \
+            printf("ssl error code:%d\n", SSL_get_error(ssl, f)); \
+            exit(1);                                              \
+        }                                                         \
     } while (0)
 #define ERR_ACTION(f, a) \
     do                   \
@@ -50,6 +51,7 @@ using namespace std;
     } while (0)
 char user_name_local[4096 + 1];
 string home_dir;
+#define DEBUG
 void ShowCerts(SSL *ssl)
 {
     X509 *cert;
@@ -139,7 +141,6 @@ restart:
     SSL_ERR_ACTION(SSL_write(ssl, tmp, strlen(tmp) + 1), "SSL WRITE FAILED IN 64", ssl);
     while (1)
     {
-
         SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
         //puts(server_buffer);
         p = ytp.parser(server_buffer);
@@ -189,6 +190,7 @@ void clean(void)
 }
 int main(int argc, char **argv)
 {
+    DEBUG;
     int sockfd, len;
     struct sockaddr_in dest;
     SSL_CTX *ctx;
@@ -253,6 +255,7 @@ int main(int argc, char **argv)
     ERR_ACTION(chdir(home_dir.c_str()), "cd to home failed");
     while (1)
     {
+        DEBUG;
         printf("ytp>");
         fflush(stdout);
         fgets(cmd_buffer, 4096, stdin);
@@ -263,9 +266,12 @@ int main(int argc, char **argv)
         }
         char cmd_tmp[4096 + 1];
         strcpy(cmd_tmp, cmd_buffer);
+        DEBUG;
+        //printf("debug:cmd:%s\n", cmd_tmp);
         part1 = strtok(cmd_tmp, " ");
         if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0 && strcmp("lcd", part1) != 0 && strcmp("lls", part1) != 0 && strcmp("lmkdir", part1) != 0 && strcmp("ltouch", part1) != 0 && strcmp("ldir", part1) != 0 && strcmp("lrm", part1) != 0 && strcmp("lpwd", part1) != 0)
         {
+            DEBUG;
             ytp_cmd.setArgs("CMD", "ACTIVE", CMD, strlen(cmd_buffer) + 1);
             strcpy(response_buffer, ytp_cmd.content);
             strcat(response_buffer, cmd_buffer);
@@ -275,6 +281,7 @@ int main(int argc, char **argv)
             SSL_ERR_ACTION(n, "read failed in 228", ssl);
             char *p = ytp_cmd.parser(server_buffer);
             printf("%s\n", p);
+            DEBUG;
         }
         else if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0)
         {
@@ -396,6 +403,8 @@ int main(int argc, char **argv)
         }
         else if (strcmp(part1, "getfile") == 0)
         {
+            DEBUG;
+            printf("debug:part1:%s\n", part1);
             char *part2, *part3;
             part2 = strtok(NULL, " ");
             part3 = strtok(NULL, " ");
@@ -416,7 +425,7 @@ int main(int argc, char **argv)
             strcat(response_buffer, cmd_buffer);
             n = SSL_write(ssl, response_buffer, strlen(response_buffer) + 1);
             SSL_ERR_ACTION(n, "ssl write failed in getfile", ssl);
-            n = SSL_read(ssl, server_buffer, 4096 + 1);
+            n = SSL_read(ssl, server_buffer, strlen(response_buffer) + 1);
             SSL_ERR_ACTION(n, "ssl read failed in getfile", ssl);
             p = ytp_cmd.parser(server_buffer);
             //printf("%d\n", ytp_cmd.code);
@@ -437,6 +446,7 @@ int main(int argc, char **argv)
                 n = recv(sockfd, &len, 4, 0);
                 ERR_ACTION(n, "recv failed in getfile:recvlen");
                 len = ntohl(len);
+                //printf("debug %d,len:%d\n", __LINE__, len);
                 lseek(filefd, len - 1, SEEK_SET);
                 n = write(filefd, "\0", 1);
                 ERR_ACTION(n, "prewrite failed in getfile");
@@ -457,7 +467,6 @@ int main(int argc, char **argv)
                 }
                 n = SSL_recv(ssl, (char *)q, len);
                 SSL_ERR_ACTION(n, "ssl recvfailed in getfile", ssl);
-
                 if (err_mark)
                 {
                     free(q);
