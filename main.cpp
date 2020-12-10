@@ -373,13 +373,31 @@ int main(int argc, char **argv)
                 perror("file doesn't exist");
                 continue;
             }
+            char tmp_file[300];
+            strcpy(tmp_file, part2);
+            char *tmp_sep = strtok(tmp_file, "/");
+            char *tok_mark = tmp_sep;
+
+            DEBUG;
+            while (1)
+            {
+                tmp_sep = strtok(NULL, "/");
+                if (tmp_sep == NULL)
+                {
+                    break;
+                }
+                tok_mark = tmp_sep;
+            }
+            string tmp_send = "sendfile ";
+            tmp_send += string(tok_mark);
+
             fseek(file, 0, SEEK_END);
             len = ftell(file);
             //printf("\nlen:%d\n", len);
             int hlen = htonl(len);
             ytp_cmd.setArgs("FILE", "ACTIVE", FSM, len + strlen("sendfile") + 1);
             strcpy(response_buffer, ytp_cmd.content);
-            strcat(response_buffer, cmd_buffer);
+            strcat(response_buffer, tmp_send.c_str());
             n = SSL_write(ssl, response_buffer, strlen(response_buffer) + 1);
             SSL_ERR_ACTION(n, "ssl write ytp failed in sendfile", ssl);
             n = send(sockfd, &hlen, sizeof(hlen), 0);
@@ -407,6 +425,8 @@ int main(int argc, char **argv)
             //printf("debug:part1:%s\n", part1);
             char *part2, *part3;
             part2 = strtok(NULL, " ");
+            char *tmp_sep;
+
             part3 = strtok(NULL, " ");
             if (part2 == NULL)
             {
@@ -419,6 +439,25 @@ int main(int argc, char **argv)
                 continue;
             }
 
+            int i = 0;
+            char tmp_file[300];
+            strcpy(tmp_file, part2);
+            tmp_sep = strtok(tmp_file, "/");
+            char *tok_mark = tmp_sep;
+
+            DEBUG;
+            while (1)
+            {
+                tmp_sep = strtok(NULL, "/");
+                if (tmp_sep == NULL)
+                {
+                    break;
+                }
+                tok_mark = tmp_sep;
+            }
+            part2 = tok_mark;
+
+            printf("debug:part2:%s\n", part2);
             char *p;
             ytp_cmd.setArgs("FILE", "ACTIVE", FSM, strlen(cmd_buffer) + 1);
             strcpy(response_buffer, ytp_cmd.content);
@@ -428,6 +467,7 @@ int main(int argc, char **argv)
             n = SSL_read(ssl, server_buffer, 4096 + 1);
             SSL_ERR_ACTION(n, "ssl read failed in getfile", ssl);
             p = ytp_cmd.parser(server_buffer);
+            //printf("debug:%s\n", server_buffer);
             //printf("%d\n", ytp_cmd.code);
             if (ytp_cmd.code == FSMF)
             {
@@ -448,9 +488,12 @@ int main(int argc, char **argv)
                 ERR_ACTION(n, "recv failed in getfile:recvlen");
                 len = ntohl(len);
                 //printf("debug %d,len:%d\n", __LINE__, len);
-                lseek(filefd, len - 1, SEEK_SET);
-                n = write(filefd, "\0", 1);
-                ERR_ACTION(n, "prewrite failed in getfile");
+                if (!err_mark)
+                {
+                    lseek(filefd, len - 1, SEEK_SET);
+                    n = write(filefd, "\0", 1);
+                    ERR_ACTION(n, "prewrite failed in getfile");
+                }
                 //int jlen = ((len - 1) / 4096 + 1) * 4096;
                 char *q;
                 if (err_mark)
