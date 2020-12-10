@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <errno.h>
 #include <sys/socket.h>
 #include <resolv.h>
@@ -13,6 +13,8 @@
 #include <sys/mman.h>
 #include <termio.h>
 #include <sys/wait.h>
+#include <string>
+#include <pwd.h>
 #include "ytp.h"
 using namespace std;
 #define MAXBUF 4096
@@ -36,7 +38,17 @@ using namespace std;
             exit(1);                               \
         }                                          \
     } while (0)
-
+#define ERR_ACTION(f, a) \
+    do                   \
+    {                    \
+        if (f < 0)       \
+        {                \
+            perror(a);   \
+            exit(1);     \
+        }                \
+    } while (0)
+char user_name_local[4096 + 1];
+string home_dir;
 void ShowCerts(SSL *ssl)
 {
     X509 *cert;
@@ -82,6 +94,7 @@ restart:
     {
         buffer[len - 1] = 0;
     }
+    //strcpy(user_name, buffer);
     // int len1;
     // len1 = htonl(len);
     // send(fd, &len1, sizeof(len1), 0);
@@ -142,7 +155,10 @@ restart:
             {
                 execlp("reset", "reset", NULL);
             }
-            wait(NULL);
+            else
+            {
+                wait(NULL);
+            }
             break;
         }
         SSL_ERR_ACTION(n = SSL_read(ssl, server_buffer, MAXSERVER + 1), "SSL READ FAILED IN 65", ssl);
@@ -226,6 +242,14 @@ int main(int argc, char **argv)
     Ytp ytp_cmd;
     char *part1;
     int n;
+    struct passwd *user_info = getpwuid(getuid());
+    strcpy(user_name_local, user_info->pw_name);
+    home_dir = "/home/" + string(user_name_local);
+    if (strcmp(user_name_local, "root") == 0)
+    {
+        home_dir = "/root";
+    }
+    ERR_ACTION(chdir(home_dir.c_str()), "cd to home failed");
     while (1)
     {
         printf("ytp>");
@@ -239,7 +263,7 @@ int main(int argc, char **argv)
         char cmd_tmp[4096 + 1];
         strcpy(cmd_tmp, cmd_buffer);
         part1 = strtok(cmd_tmp, " ");
-        if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0)
+        if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0 && strcmp("lcd", part1) != 0 && strcmp("lls", part1) != 0 && strcmp("lmkdir", part1) != 0 && strcmp("ltouch", part1) != 0 && strcmp("ldir", part1) != 0 && strcmp("lrm", part1) != 0 && strcmp("lpwd", part1) != 0)
         {
             ytp_cmd.setArgs("CMD", "ACTIVE", CMD, strlen(cmd_buffer) + 1);
             strcpy(response_buffer, ytp_cmd.content);
@@ -250,6 +274,78 @@ int main(int argc, char **argv)
             SSL_ERR_ACTION(n, "read failed in 228", ssl);
             char *p = ytp_cmd.parser(server_buffer);
             printf("%s\n", p);
+        }
+        else if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0)
+        {
+            char pdir[4096 + 1] = {0};
+
+            if (strcmp(part1, "lcd") == 0)
+            {
+
+                char *part2, *part3;
+                part2 = strtok(NULL, " ");
+                part3 = strtok(NULL, " ");
+                if (part3 != NULL)
+                {
+                    printf("too much arguments\n");
+                }
+                else if (part2 == NULL)
+                {
+                    getcwd(pdir, 4096);
+                    printf("now in %s\n", pdir);
+                }
+                else if (strcmp("~", part2) == 0)
+                {
+                    int res = chdir(home_dir.c_str());
+                    if (res < 0)
+                    {
+                        perror("lcd failed");
+                    }
+                    getcwd(pdir, 4096);
+                    printf("now in %s\n", pdir);
+                }
+                else
+                {
+                    int res = chdir(part2);
+                    if (res < 0)
+                    {
+                        perror("lcd failed");
+                    }
+                    getcwd(pdir, 4096);
+                    printf("now in %s\n", pdir);
+                }
+            }
+            else
+            {
+                memmove(part1, part1 + 1, strlen(part1));
+                //printf("debug:local cmd:%s\n", part1);
+                char *cmd_list[40];
+                cmd_list[0] = part1;
+                char *tmp;
+                for (int i = 1; i < 40; i++)
+                {
+                    tmp = strtok(NULL, " ");
+                    cmd_list[i] = tmp;
+                    if (tmp == NULL)
+                    {
+                        break;
+                    }
+                }
+                int pid = fork();
+                if (pid == 0)
+                {
+                    execvp(part1, cmd_list);
+                    perror("execv cmd failed");
+                    exit(1);
+                }
+                else
+                {
+                    wait(NULL);
+                }
+            }
+        }
+        else if (strcmp(part1, "sendfile") == 0)
+        {
         }
     }
 }
