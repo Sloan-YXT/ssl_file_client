@@ -16,6 +16,7 @@
 #include <string>
 #include <pwd.h>
 #include "ytp.h"
+#include "ssl_util.h"
 using namespace std;
 #define MAXBUF 4096
 #define MAXSERVER 4096
@@ -346,6 +347,50 @@ int main(int argc, char **argv)
         }
         else if (strcmp(part1, "sendfile") == 0)
         {
+            char *part2, *part3;
+            part2 = strtok(NULL, " ");
+            part3 = strtok(NULL, " ");
+            if (part2 == NULL)
+            {
+                printf("too few arguments\n");
+                continue;
+            }
+            if (part3 != NULL)
+            {
+                printf("too much arguments\n");
+                continue;
+            }
+            FILE *file = fopen(part2, "r");
+            if (file == NULL)
+            {
+                perror("file doesn't exist");
+                continue;
+            }
+            fseek(file, 0, SEEK_END);
+            len = ftell(file);
+            //printf("\nlen:%d\n", len);
+            int hlen = htonl(len);
+            ytp_cmd.setArgs("FILE", "ACTIVE", FSM, len + strlen("sendfile") + 1);
+            strcpy(response_buffer, ytp_cmd.content);
+            strcat(response_buffer, cmd_buffer);
+            n = SSL_write(ssl, response_buffer, strlen(response_buffer) + 1);
+            SSL_ERR_ACTION(n, "ssl write ytp failed in sendfile", ssl);
+            n = send(sockfd, &hlen, sizeof(hlen), 0);
+            ERR_ACTION(n, "sendfile len send len failed");
+            int filefd = fileno(file);
+            fseek(file, 0, SEEK_SET);
+            void *addr_png_1;
+            if ((addr_png_1 = mmap(NULL, len, PROT_READ, MAP_SHARED, filefd, 0)) == MAP_FAILED)
+            {
+                perror("mmap failed in sendfile");
+                exit(1);
+            };
+            n = SSL_write(ssl, addr_png_1, len);
+            SSL_ERR_ACTION(n, "ssl write failed", ssl);
+            ERR_ACTION(munmap(addr_png_1, len), "munmap failed in sendfile");
+            n = SSL_read(ssl, cmd_buffer, 4096 + 1);
+            char *p = ytp_cmd.parser(cmd_buffer);
+            printf("%s\n", p);
         }
     }
 }
