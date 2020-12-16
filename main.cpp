@@ -260,6 +260,10 @@ int main(int argc, char **argv)
         fflush(stdout);
         fgets(cmd_buffer, 4096, stdin);
         len = strlen(cmd_buffer);
+        if (len == 1)
+        {
+            continue;
+        }
         if (len != 0 && cmd_buffer[len - 1] == '\n')
         {
             cmd_buffer[len - 1] = 0;
@@ -267,9 +271,18 @@ int main(int argc, char **argv)
         char cmd_tmp[4096 + 1];
         strcpy(cmd_tmp, cmd_buffer);
         DEBUG;
-        //printf("debug:cmd:%s\n", cmd_tmp);
+
         part1 = strtok(cmd_tmp, " ");
-        if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0 && strcmp("lcd", part1) != 0 && strcmp("lls", part1) != 0 && strcmp("lmkdir", part1) != 0 && strcmp("ltouch", part1) != 0 && strcmp("ldir", part1) != 0 && strcmp("lrm", part1) != 0 && strcmp("lpwd", part1) != 0)
+        if (part1 == NULL)
+        {
+            continue;
+        }
+        if (strcasecmp(part1, "quit") == 0 | strcasecmp(part1, "q") == 0 | strcasecmp(part1, "exit") == 0)
+        {
+            printf("bye bye\n");
+            exit(1);
+        }
+        else if (strcmp(part1, "getfile") != 0 && strcmp(part1, "sendfile") != 0 && strcmp("lcd", part1) != 0 && strcmp("lls", part1) != 0 && strcmp("lmkdir", part1) != 0 && strcmp("ltouch", part1) != 0 && strcmp("ldir", part1) != 0 && strcmp("lrm", part1) != 0 && strcmp("lpwd", part1) != 0)
         {
             DEBUG;
             ytp_cmd.setArgs("CMD", "ACTIVE", CMD, strlen(cmd_buffer) + 1);

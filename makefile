@@ -1,5 +1,5 @@
 quick:main.cpp ytp.cpp ssl_util.cpp
-	g++ main.cpp ytp.cpp ssl_util.cpp -o client -lssl -lcrypto
+	g++ main.cpp ytp.cpp ssl_util.cpp -o client -lssl -lcrypto 
 clean:
 	-rm *.o client
 .PHONY:clean
